@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-import socket, sys, StringIO, json, os
+import socket, sys, StringIO, json, os, time
 from server import transfer
 
 def main():
@@ -10,8 +10,8 @@ def main():
 
 def takeInput():
     global user;
-    userinput = input('#: ');
-    userinput = userinput.split();
+    userinput = raw_input('#: ');
+    userinput = userinput.split()
     if "exit" in userinput:
         if userinput.index("exit") is 0:
             print("Bye");
@@ -36,7 +36,9 @@ def handleInput(userinput):
     global transfer;
     if "file" in userinput and userinput.index("file") is 0:
         transfer.sendText( userinput[1] )
+        print "Requested "+userinput[1]
         if transfer.reciveFile( "/home/johnny/Documents/test/client/", readFile ):
+            print "Received "+userinput[1]
             return True
     elif "insert" in userinput and userinput.index("insert") is 0:
         pre = userinput[2:];
@@ -90,4 +92,5 @@ def handleInput(userinput):
 
 if __name__ == "__main__":
     transfer = transfer()
+    transfer.myPort = 9998
     main()
