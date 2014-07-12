@@ -6,11 +6,14 @@ from pysql import client
 
 def main():
     global client
-    request = client.takeInput()
-    while request:
-        received = client.sendRecive( request )
-        print "%s" % received
+    if len(sys.argv) > 1:
         request = client.takeInput()
+        while request:
+            received = client.query( request )
+            print "%s" % received
+            request = client.takeInput()
+    else:
+        print client.query( "configure create" )
 
 if __name__ == "__main__":
     client = client()
