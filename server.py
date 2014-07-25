@@ -6,7 +6,10 @@ from multiprocessing import Process
 from pysql import server
 
 def main():
-    server().start()
+    try:
+        server().start()
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -7,10 +7,11 @@ from pysql import client
 def main():
     global client
     if len(sys.argv) > 1:
-        request = client.takeInput()
+        request = client.takeInput( sys.argv[1:] )
         while request:
-            received = client.query( request )
-            print "%s" % received
+            if "Don't query" != request:
+                received = client.query( request )
+                print "%s" % received
             request = client.takeInput()
     else:
         print client.query( "configure create" )

@@ -1,28 +1,44 @@
-import socket, SocketServer, sys, StringIO, json, os, time, inspect
+import socket, SocketServer, sys, StringIO, json, os, time, inspect, BaseHTTPServer
+from SimpleHTTPServer import SimpleHTTPRequestHandler
 from optparse import OptionParser
 from multiprocessing import Process
 
 class client(object):
     HOST, PORT = "localhost", 9999
 
+    def host( self, ip  ):
+        self.HOST = ip[0]
+        return "Server now at %s:%d" % (self.HOST, self.PORT)
+
+    def port( self, port  ):
+        self.PORT = int(port[0])
+        return "Server now at %s:%d" % (self.HOST, self.PORT)
+
     def query( self, send ):
-        # Create a socket (SOCK_STREAM means a TCP socket)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
         try:
-            # Connect to server and send send
             sock.connect((self.HOST, self.PORT))
+        except:
+            return "Couldn't connect to server on %s:%d" % (self.HOST, self.PORT)
+        try:
             sock.sendall(send + "\n")
-        
-            # Receive data from the server and shut down
+        except:
+            return "Couldn't send to server"
+        try:
             received = sock.recv(1024)
+        except:
+            return "No response from server"
         finally:
             sock.close()
-        return received
+        if received:
+            return received
 
-    def takeInput( self ):
-        userinputString = raw_input('#: ');
-        userinput = userinputString.split()
+    def takeInput( self, text=None ):
+        if text:
+            userinput = text
+        else:
+            userinputString = raw_input('#: ');
+            userinput = userinputString.split()
         if "exit" in userinput:
             if userinput.index("exit") is 0:
                 print("Bye");
@@ -31,36 +47,77 @@ class client(object):
             if userinput.index("logout") is 0:
                 print("Bye");
                 return False;
+        error = self.handleInput( userinput )
+        if error:
+            print error
+            return "Don't query"
         else:
-            return userinputString
+            return " ".join(userinput)
 
+    def handleInput( self, userinput ):
+        for method in inspect.getmembers(server(), predicate=inspect.ismethod):
+            if method[0] == userinput[0]:
+                return False
+        for method in inspect.getmembers(self, predicate=inspect.ismethod):
+            if method[0] == userinput[0]:
+                return getattr(self, method[0])( userinput[1:] )
+        return "You have an error in your PySQL syntax";
+    
 class server(object):
     saveLocation = "./.dbs/"
     myAddress = '0.0.0.0'
     myPort = 9999
+    myWebPort = 9998
     connections = {}
     
     def startServer( self ):
         server = SocketServer.TCPServer((self.myAddress, self.myPort), ConnectionHandler)
+        print "Serving PySQL on %s:%d" % (self.myAddress, self.myPort)
         server.serve_forever()
 
     def start( self ):
         p = Process( target=self.startServer )
         p.start()
+        w = Process( target=self.startWebServer )
+        w.start()
+
+    def startWebServer( self ):
+        os.chdir("./.dbs")
+        HandlerClass = SimpleHTTPRequestHandler
+        ServerClass  = BaseHTTPServer.HTTPServer
+        Protocol     = "HTTP/1.0"
+        
+        server_address = (self.myAddress, self.myWebPort)
+        
+        HandlerClass.protocol_version = Protocol
+        httpd = ServerClass(server_address, HandlerClass)
+        
+        sa = httpd.socket.getsockname()
+        print "Serving HTTP on %s:%d" % (self.myAddress, self.myWebPort)
+        httpd.serve_forever()
 
     def handleInput( self, userinput ):
         userinput = userinput.split(" ")
-        error = True
         for method in inspect.getmembers(self, predicate=inspect.ismethod):
             if method[0] == userinput[0]:
                 return getattr(self, method[0])( userinput[1:] )
         return "You have an error in your PySQL syntax";
     
     def insert( self, userinput ):
+        obj = self.stringToObject(userinput)
+        return "OK"
+    
+    def stringToObject( self, userinput ):
         obj = {};
         for word in userinput:
-            obj[ word.split(":")[0] ] = word.split(":")[1];
-        return "OK"
+            try:
+                obj[ word.split(":")[0] ] = word.split(":")[1];
+            except:
+                try:
+                    obj[ word.split(":")[0] ] = True;
+                except:
+                    break
+        return obj
 
     def select( self, userinput ):
         if userinput[0] == "all":
@@ -90,7 +147,9 @@ class server(object):
                 return table + " created"
     
     def show( self, userinput ):
-        if userinput[0] == "databases":
+        userinput = self.stringToObject(userinput)
+        #return json.dumps(res, sort_keys=True, indent=4, separators=(',', ': '))
+        if userinput["databases"]:
             if os.path.exists( self.saveLocation ):
                 res = os.listdir( self.saveLocation )
             else:
@@ -191,6 +250,7 @@ class server(object):
 
 class ConnectionHandler(SocketServer.BaseRequestHandler):
     def handle(self):
+        print self
         self.data = self.request.recv(1024).strip()
         response = server().handleInput( self.data )
         #print response
