@@ -54,5 +54,31 @@ function pynosql(){
 		xmlhttp.open("GET", url, true);
 		xmlhttp.send();
 		}
+	this.query = function( query, callback ){
+		var xmlhttp;
+		if (window.XMLHttpRequest) {
+			xmlhttp = new XMLHttpRequest();
+			}
+		else {
+			xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+			}
+		xmlhttp.onreadystatechange = function() {
+			if (xmlhttp.readyState == 4 ) {
+				if(xmlhttp.status == 200){
+					if ( typeof callback !== "undefined" ) callback( xmlhttp.responseText );
+					}
+				else if(xmlhttp.status == 400) {
+					console.log('There was an error 400');
+					}
+				else {
+					console.log('something else other than 200 was returned');
+					}
+				}
+			}
+		var url = 'http://'+this.host+':'+this.port+'/';
+		xmlhttp.setRequestHeader("query", query);
+		xmlhttp.open("GET", url, true);
+		xmlhttp.send();
+		}
 	return this;
 	}

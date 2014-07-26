@@ -286,6 +286,26 @@ class server(object):
                 res = "Options are create, change"
         return res
 
+    def view( self, userinput ):
+        if len(userinput) > 0:
+            if userinput[0] == "create":
+                os.makedirs( self.saveLocation )
+                res = "The database directory " + self.saveLocation + " created"
+            elif userinput[0] == "change":
+                if len(userinput) >= 2:
+                    if os.path.exists( self.saveLocation ):
+                        os.system("mv %s %s" % ( self.saveLocation, userinput[1]) )
+                    self.saveLocation = userinput[1]
+                    res = "The database directory changed to " + self.saveLocation
+                else:
+                    res = "The database directory is currently " + self.saveLocation
+        else:
+            if not os.path.exists( self.saveLocation ):
+                res = "The database directory " + self.saveLocation + " does not exist do you want to create it or change it?\n" + "configure create, configure change < saveLocation >"
+            else:
+                res = "Options are create, change"
+        return res
+
     def writeObject( self, file, jsonName, obj ):
         f = open(file,'a');
         f.write(jsonName+"-->");
@@ -326,7 +346,6 @@ class ConnectionHandler(SocketServer.BaseRequestHandler):
 class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_my_headers()
-
         SimpleHTTPServer.SimpleHTTPRequestHandler.end_headers(self)
 
     def send_my_headers(self):
@@ -334,6 +353,10 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Expose-Headers", "Access-Control-Allow-Origin");
         self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 
-
-if __name__ == '__main__':
-    SimpleHTTPServer.test(HandlerClass=MyHTTPRequestHandler)
+    def do_GET(self):
+        if self.path.find('?') != -1:
+            request = self.path.split('/')[1][1:].replace("%20", " ")
+            print request
+            print server().handleInput(request)
+        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+        #print json.dumps( self, sort_keys=True, indent=4, separators=(',', ': '))
