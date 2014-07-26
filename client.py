@@ -1,5 +1,6 @@
 #! /usr/bin/python
-from pynosql import client
+from pynosql import client, server
 
 if __name__ == "__main__":
+    server().start()
     client()._run()
