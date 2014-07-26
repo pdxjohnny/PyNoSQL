@@ -4,7 +4,15 @@ from optparse import OptionParser
 from multiprocessing import Process
 
 class client(object):
-    HOST, PORT = "localhost", 9999
+
+    def __init__( self ):
+        self.HOST = "localhost"
+        self.PORT = 9999
+        self.database = None
+
+    def use( self, database ):
+        self.database = database[0]
+        return "Using database " + self.database
 
     def host( self, ip  ):
         self.HOST = ip[0]
@@ -15,6 +23,15 @@ class client(object):
         return "Server now at %s:%d" % (self.HOST, self.PORT)
 
     def query( self, send ):
+        text = self.handleInput( send.split(" ") )
+        if text:
+            return text
+        if self.database and "show" in send.split(" ") \
+            or "insert" in send.split(" ") or "select" in send.split(" "):
+            if send[-1] is ' ':
+                send += "database:" + self.database
+            else:
+                send += " database:" + self.database
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((self.HOST, self.PORT))
@@ -33,7 +50,7 @@ class client(object):
         if received:
             return received
 
-    def takeInput( self, text=None ):
+    def takeInput( self, text=None, user=True ):
         if text:
             userinput = text
         else:
@@ -49,26 +66,30 @@ class client(object):
                 return False;
         error = self.handleInput( userinput )
         if error:
-            print error
+            if user:
+                print error
             return "Don't query"
         else:
             return " ".join(userinput)
 
     def handleInput( self, userinput ):
-        for method in inspect.getmembers(server(), predicate=inspect.ismethod):
-            if method[0] == userinput[0]:
-                return False
         for method in inspect.getmembers(self, predicate=inspect.ismethod):
             if method[0] == userinput[0]:
                 return getattr(self, method[0])( userinput[1:] )
-        return "You have an error in your PySQL syntax";
-    
+        for method in inspect.getmembers(server(), predicate=inspect.ismethod):
+            if method[0] == userinput[0]:
+                return False
+        return "You have an error in your PySQL syntax";        
+
 class server(object):
-    saveLocation = "./.dbs/"
-    myAddress = '0.0.0.0'
-    myPort = 9999
-    myWebPort = 9998
-    connections = {}
+    def __init__( self ):
+        self.saveLocation = "./.dbs/"
+        self.myAddress = '0.0.0.0'
+        self.myPort = 9999
+        self.myWebPort = 9998
+        self.connections = {}
+        if not os.path.exists( self.saveLocation ):
+            os.makedirs( self.saveLocation )
     
     def startServer( self ):
         server = SocketServer.TCPServer((self.myAddress, self.myPort), ConnectionHandler)
@@ -82,7 +103,7 @@ class server(object):
         w.start()
 
     def startWebServer( self ):
-        os.chdir("./.dbs")
+        os.chdir( self.saveLocation )
         HandlerClass = SimpleHTTPRequestHandler
         ServerClass  = BaseHTTPServer.HTTPServer
         Protocol     = "HTTP/1.0"
@@ -93,6 +114,11 @@ class server(object):
         httpd = ServerClass(server_address, HandlerClass)
         
         sa = httpd.socket.getsockname()
+        databases = os.listdir( "./" )
+        if len(databases) > 0 and "index.html" in databases:
+            del databases[databases.index("index.html")]
+        with open( "index.html" , 'w') as outfile:
+            json.dump( databases, outfile)
         print "Serving HTTP on %s:%d" % (self.myAddress, self.myWebPort)
         httpd.serve_forever()
 
@@ -102,11 +128,23 @@ class server(object):
             if method[0] == userinput[0]:
                 return getattr(self, method[0])( userinput[1:] )
         return "You have an error in your PySQL syntax";
-    
+
     def insert( self, userinput ):
         obj = self.stringToObject(userinput)
+        if obj.get("database"):
+            if obj.get("table"):
+                insert = {}
+                for value in obj:
+                    if value != "database" and value != "table":
+                        insert[value] = obj[value]
+                print insert
+                self.appendJsonToFile( self.saveLocation + obj.get("database") + "/" + obj.get("table") + ".html" , insert )
+            else:
+                return "No table"
+        else:
+            return "No database"
         return "OK"
-    
+
     def stringToObject( self, userinput ):
         obj = {};
         for word in userinput:
@@ -120,50 +158,80 @@ class server(object):
         return obj
 
     def select( self, userinput ):
-        if userinput[0] == "all":
-            printObject(user);
-        elif userinput[0] in user:
-            print(user[userinput[0]]);
+        userinput = self.stringToObject(userinput)
+        print json.dumps(userinput, sort_keys=True, indent=4, separators=(',', ': '))
+        if userinput.get("table") and userinput.get("database"):
+            if userinput.get("all"):
+                with open( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" , 'r') as outfile:
+                    output = ""
+                    for line in outfile:
+                        output += line
+                    return '[' + output[:-2] + ']'
         else:
-            print("Sorry that JSON is not in memory");
-    
+            return "Specify database and table"
+
     def create( self, userinput ):
-        if userinput[0] == "database":
-            db = userinput[1];
-            if os.path.exists( self.saveLocation + db ):
-                return  db + " already exists"
+        userinput = self.stringToObject(userinput)
+        print json.dumps(userinput, sort_keys=True, indent=4, separators=(',', ': '))
+        if userinput.get("table") and userinput.get("database"):
+            if userinput["database"] == "":
+                return "Specify a database"
+            if os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
+                return userinput["table"] + " already exists"
             else:
-                os.makedirs( self.saveLocation + db )
-                return "Database initialised"
-        if userinput[0] == "table":
-            if db == "":
-                return "Use a database first"
-            table = userinput[1];
-            if os.path.exists( self.saveLocation + db + "/" + table ):
-                return  table + " already exists"
-            else:
-                file = open( self.saveLocation + db + "/" + table, "w")
+                file = open( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" , "w")
                 file.close();
-                return table + " created"
-    
+                tables = os.listdir( self.saveLocation + userinput["database"] )
+                if len(tables) > 0 and "index.html" in tables:
+                    del tables[tables.index("index.html")]
+                with open( self.saveLocation + userinput["database"] + "/index.html" , 'w') as outfile:
+                    json.dump( tables, outfile)
+                return userinput["table"] + " created"
+        elif userinput.get("database"):
+            if os.path.exists( self.saveLocation + userinput["database"] ):
+                return userinput["database"] + " already exists"
+            else:
+                os.makedirs( self.saveLocation + userinput["database"] )
+                databases = os.listdir( self.saveLocation )
+                if len(databases) > 0 and "index.html" in databases:
+                    del databases[databases.index("index.html")]
+                with open( self.saveLocation + "index.html" , 'w') as outfile:
+                    json.dump( databases, outfile)
+                tables = os.listdir( self.saveLocation + userinput["database"] )
+                if len(tables) > 0 and "index.html" in tables:
+                    del tables[tables.index("index.html")]
+                with open( self.saveLocation + userinput["database"] + "/index.html" , 'w') as outfile:
+                    json.dump( tables, outfile)
+                return json.dumps( {userinput["database"]:True}, sort_keys=True, indent=4, separators=(',', ': '))
+
     def show( self, userinput ):
         userinput = self.stringToObject(userinput)
-        #return json.dumps(res, sort_keys=True, indent=4, separators=(',', ': '))
-        if userinput["databases"]:
+        print json.dumps(userinput, sort_keys=True, indent=4, separators=(',', ': '))
+        if userinput.get("tables") and userinput.get("database"):
+            if userinput["database"] == True:
+                return "Specify a database" + "\n"
+            elif os.path.exists( self.saveLocation + userinput["database"] ):
+                tables = os.listdir( self.saveLocation + userinput["database"] )
+                if "index.html" in tables:
+                    del tables[tables.index("index.html")]
+                with open( self.saveLocation + userinput["database"] + "/index.html" , 'w') as outfile:
+                    json.dump( tables, outfile)
+                return json.dumps( tables, sort_keys=True, indent=4, separators=(',', ': ')) 
+            else:
+                return "Database doesn't exist" + "\n"
+        elif userinput.get("databases"):
             if os.path.exists( self.saveLocation ):
-                res = os.listdir( self.saveLocation )
+                databases = os.listdir( self.saveLocation )
+                if "index.html" in databases:
+                    del databases[databases.index("index.html")]
+                with open( self.saveLocation + "index.html" , 'w') as outfile:
+                    json.dump( databases, outfile)
+                return json.dumps( databases, sort_keys=True, indent=4, separators=(',', ': '))
             else:
-                res = "No database directory, please exicute: configure"
-        if userinput[0] == "tables":
-            if db == "":
-                res = "Use a database first" + "\n"
-            if os.path.exists( self.saveLocation + db ):
-                res = "Showing tables for " + db + "\n" 
-                res += os.listdir( self.saveLocation + db )
-            else:
-                res = "Database doesn't exist" + "\n"
-        return res
-    
+                return "No database directory, please exicute: configure"
+        else:
+            return "Usage, show tables database:example, show databases"
+
     def configure( self, userinput ):
         if len(userinput) > 0:
             if userinput[0] == "create":
@@ -183,13 +251,13 @@ class server(object):
             else:
                 res = "Options are create, change"
         return res
-    
+
     def printObj( self, obj ):
         if isinstance(obj, dict):
             printObject(obj)
         if isinstance(obj, list):
             printArray(obj)
-    
+
     def printObject( self, obj ):
         for i in obj:
             if isinstance(obj[i], dict):
@@ -197,7 +265,7 @@ class server(object):
                 printObject(obj[i])
             else:
                 print("\t"+i+": "+str(obj[i]) );
-    
+
     def printArray( self, array ):
         for i in array:
             if isinstance(i, list):
@@ -205,7 +273,7 @@ class server(object):
                 printArray(array[i])
             else:
                 print("\t"+i);
-    
+
     def writeObject( self, file, jsonName, obj ):
         f = open(file,'a');
         f.write(jsonName+"-->");
@@ -218,19 +286,18 @@ class server(object):
                 f.close();
                 return True;
         f.close();
-    
+
     def writeJsonToFile( self, file, jsonToWrite ):
         f = open(file,'w');
         json.dump(jsonToWrite, f);
         f.close();
-    
-    def appendJsonToFile( self, file, jsonToWrite ):
-        f = open(file,'a');
-        f.write('\n');
+
+    def appendJsonToFile( self, filename, jsonToWrite ):
+        f = open(filename,'a');
         json.dump(jsonToWrite, f);
-        f.write('\n');
+        f.write(',\n');
         f.close();
-    
+
     def loadJsonsFromFile( self, filename, array ):
         file = open(filename,'rU');
         for line in file:
@@ -241,7 +308,7 @@ class server(object):
             array[name] = json.loads(obj);
         file.close();
         return array;
-    
+
     def contains( self, obj, string ):
         if obj.get(string):
             return True;

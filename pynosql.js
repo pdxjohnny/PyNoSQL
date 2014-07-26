@@ -1,0 +1,1 @@
+JSON.parse('[' + document.body.innerHTML.slice(0, -2) + ']')
