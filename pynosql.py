@@ -1,5 +1,4 @@
-import socket, SocketServer, sys, StringIO, json, os, time, inspect, BaseHTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+import socket, SocketServer, sys, StringIO, json, os, time, inspect, BaseHTTPServer, SimpleHTTPServer
 from optparse import OptionParser
 from multiprocessing import Process
 
@@ -21,6 +20,14 @@ class client(object):
     def port( self, port  ):
         self.PORT = int(port[0])
         return "Server now at %s:%d" % (self.HOST, self.PORT)
+
+    def _run( self ):
+        request = self.takeInput()
+        while request:
+            if "Don't query" != request:
+                received = self.query( request )
+                print "%s" % received
+            request = self.takeInput()
 
     def query( self, send ):
         text = self.handleInput( send.split(" ") )
@@ -50,7 +57,7 @@ class client(object):
         if received:
             return received
 
-    def takeInput( self, text=None, user=True ):
+    def takeInput( self, text=None ):
         if text:
             userinput = text
         else:
@@ -66,8 +73,7 @@ class client(object):
                 return False;
         error = self.handleInput( userinput )
         if error:
-            if user:
-                print error
+            print error
             return "Don't query"
         else:
             return " ".join(userinput)
@@ -104,12 +110,12 @@ class server(object):
 
     def startWebServer( self ):
         os.chdir( self.saveLocation )
-        HandlerClass = SimpleHTTPRequestHandler
+        HandlerClass = MyHTTPRequestHandler
         ServerClass  = BaseHTTPServer.HTTPServer
         Protocol     = "HTTP/1.0"
         
         server_address = (self.myAddress, self.myWebPort)
-        
+
         HandlerClass.protocol_version = Protocol
         httpd = ServerClass(server_address, HandlerClass)
         
@@ -322,3 +328,18 @@ class ConnectionHandler(SocketServer.BaseRequestHandler):
         response = server().handleInput( self.data )
         #print response
         self.request.sendall( response )
+
+class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_my_headers()
+
+        SimpleHTTPServer.SimpleHTTPRequestHandler.end_headers(self)
+
+    def send_my_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*");
+        self.send_header("Access-Control-Expose-Headers", "Access-Control-Allow-Origin");
+        self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+
+
+if __name__ == '__main__':
+    SimpleHTTPServer.test(HandlerClass=MyHTTPRequestHandler)
