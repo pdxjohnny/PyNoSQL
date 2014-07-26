@@ -3,4 +3,4 @@ from pynosql import client, server
 
 if __name__ == "__main__":
     server().start()
-    client()._run()
+    client().console()

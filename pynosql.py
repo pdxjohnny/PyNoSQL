@@ -28,6 +28,7 @@ class client(object):
                 received = self.query( request )
                 print "%s" % received
             request = self.takeInput()
+        sys.exit(0)
 
     def query( self, send ):
         text = self.handleInput( send.split(" ") )
