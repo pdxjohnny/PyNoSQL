@@ -91,6 +91,9 @@ class client(object):
         return "You have an error in your PySQL syntax";        
 
 class server(object):
+    """
+    Server accepts query's in the format of: action {JSON}
+    """
     def __init__( self ):
         self.saveLocation = ".dbs/"
         self.myAddress = '0.0.0.0'
@@ -106,21 +109,17 @@ class server(object):
 
     def start( self ):
         p = Process( target=self.startServer )
-        p.start()
-        time.sleep(0.5)
         w = Process( target=self.startWebServer )
+        p.start()
         w.start()
 
     def startWebServer( self ):
         HandlerClass = MyHTTPRequestHandler
         ServerClass  = BaseHTTPServer.HTTPServer
         Protocol     = "HTTP/1.0"
-        
         server_address = (self.myAddress, self.myWebPort)
-
         HandlerClass.protocol_version = Protocol
         httpd = ServerClass(server_address, HandlerClass)
-        
         sa = httpd.socket.getsockname()
         httpd.serve_forever()
 
@@ -134,6 +133,9 @@ class server(object):
         return "You have an error in your PySQL syntax";
 
     def insert( self, userinput ):
+        """
+        insert: needs database and table random _id assigned if not specified
+        """
         obj = self.stringToObject(userinput)
         if obj.get("database"):
             if obj.get("table"):
@@ -153,6 +155,9 @@ class server(object):
         return json.loads( request )
 
     def select( self, userinput ):
+        """
+        select: will return a table if all is true or a single json if _id is given
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
             if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
@@ -175,6 +180,9 @@ class server(object):
             return "Specify database and table"
 
     def delete( self, userinput ):
+        """
+        delete: removes a json
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
             if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
@@ -191,6 +199,9 @@ class server(object):
             return "Specify database and table"
 
     def update( self, userinput ):
+        """
+        update: updates a json or creates it if it was not found, updates using _id
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
             if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
@@ -212,6 +223,9 @@ class server(object):
             return "Specify database and table"
 
     def create( self, userinput ):
+        """
+        creates: creates a table or a database
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
             if userinput["database"] == True:
@@ -232,6 +246,9 @@ class server(object):
             return json.dumps( userinput, sort_keys=True, indent=4, separators=(',', ': '))
 
     def drop( self, userinput ):
+        """
+        drop: removes a database or a table
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
             if userinput["database"] == True:
@@ -251,6 +268,9 @@ class server(object):
             return json.dumps( userinput, sort_keys=True, indent=4, separators=(',', ': '))
 
     def show( self, userinput ):
+        """
+        show: shows all databases or tables of a database
+        """
         userinput = self.stringToObject(userinput)
         if userinput.get("tables") and userinput.get("database"):
             if userinput["database"] == True:
@@ -270,26 +290,6 @@ class server(object):
             return "Usage, show tables database:example, show databases"
 
     def configure( self, userinput ):
-        if len(userinput) > 0:
-            if userinput[0] == "create":
-                os.makedirs( self.saveLocation )
-                res = "The database directory " + self.saveLocation + " created"
-            elif userinput[0] == "change":
-                if len(userinput) >= 2:
-                    if os.path.exists( self.saveLocation ):
-                        os.system("mv %s %s" % ( self.saveLocation, userinput[1]) )
-                    self.saveLocation = userinput[1]
-                    res = "The database directory changed to " + self.saveLocation
-                else:
-                    res = "The database directory is currently " + self.saveLocation
-        else:
-            if not os.path.exists( self.saveLocation ):
-                res = "The database directory " + self.saveLocation + " does not exist do you want to create it or change it?\n" + "configure create, configure change < saveLocation >"
-            else:
-                res = "Options are create, change"
-        return res
-
-    def view( self, userinput ):
         if len(userinput) > 0:
             if userinput[0] == "create":
                 os.makedirs( self.saveLocation )
@@ -329,7 +329,6 @@ class server(object):
 
     def removeJsonFromFile( self, filename, _id ):
         fro = open(filename, "rb")
-
         res = False
         while True:
             line = fro.readline()
@@ -341,15 +340,12 @@ class server(object):
                 print seekpoint
                 res = True
                 break
-
         frw = open(filename, "r+b")
         frw.seek(seekpoint, 0)
-
         chars = fro.readline()
         while chars:
             frw.writelines(chars)
             chars = fro.readline()
-
         fro.close()
         frw.truncate()
         frw.close()
@@ -372,24 +368,30 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         SimpleHTTPServer.SimpleHTTPRequestHandler.end_headers(self)
 
     def do_GET(self):
+        print self.path
         if self.path.find('?') != -1:
-            #try:
-            request = self.path.split('/')[1][1:]
-            request = urllib.unquote_plus( request )
-            response = server().handleInput(request)
-            #except:
-            #    response = "Server error"
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.send_header("Content-length", len(response))
-            self.end_headers()
-            self.wfile.write(response)
-            return True
+            try:
+                request = self.path.split('/')[1][1:]
+                request = urllib.unquote_plus( request )
+                response = server().handleInput(request)
+            except:
+                response = "Server Error"
+        elif self.path.find('pynosql.js') != -1:
+            with open( 'pynosql.js' , 'r') as outfile:
+                response = ""
+                for line in outfile:
+                    response += line
         else:
-            response = "No query"
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.send_header("Content-length", len(response))
-            self.end_headers()
-            self.wfile.write(response)
-            return True
+            response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:gray;'><h1>Welcome to PyNoSQL<hr></h1>"
+            for method in inspect.getmembers(server(), predicate=inspect.ismethod):
+                try:
+                    response += getattr(server(), method[0]).__doc__ + "<br><br>"
+                except:
+                    pass
+            response += "</body>"
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.send_header("Content-length", len(response))
+        self.end_headers()
+        self.wfile.write(response)
+        return True
