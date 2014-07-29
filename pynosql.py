@@ -382,7 +382,7 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 for line in outfile:
                     response += line
         else:
-            response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:gray;'><h1>Welcome to PyNoSQL<hr></h1>"
+            response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:#707070;'><h1>Welcome to PyNoSQL<hr></h1>"
             for method in inspect.getmembers(server(), predicate=inspect.ismethod):
                 try:
                     response += getattr(server(), method[0]).__doc__ + "<br><br>"
@@ -395,3 +395,6 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response)
         return True
+
+if __name__ == "__main__":
+    server().start()
