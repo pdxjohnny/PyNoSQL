@@ -1,0 +1,61 @@
+<script type="text/javascript" src="//localhost:9998/pynosql.js" ></script>
+<select id="databases" ></select>
+<select id="tables" ></select>
+<div id="table" ></div>
+<script>
+con = new pynosql();
+
+dothis = {
+		_action: "show",
+		databases: true
+	};
+
+con.query( dothis, function(databases){
+	databases = JSON.parse(databases)
+	var holder = document.getElementById('databases');
+	for ( var db in databases ){
+		holder.innerHTML += "<option id='"+db+"'>"+databases[db]+"</option>";
+		}
+	showTables( databases[0] )
+	});
+
+function showTables( database ){
+	database = {
+		_action: "show",
+		database: database,
+		tables: true
+		};
+	con.query( database, function(tables){
+		tables = JSON.parse(tables)
+		var holder = document.getElementById('tables');
+		for ( var table in tables ){
+			holder.innerHTML += "<option id='"+table+"'>"+tables[table]+"</option>";
+			}
+		getTable( database.database, tables[0] )
+		});
+	}
+
+function getTable( database, table ){
+	table = {
+		_action: "select",
+		database: database,
+		table: table,
+		all: true
+		};
+	con.query( table, function(table){
+		console.log(table)
+		table = JSON.parse(table);
+		table = con.makeTable( table );
+		holder = document.getElementById('table');
+		holder.appendChild( table );
+		});
+	}
+</script>
+
+<style>
+body {
+	align = center;
+	font:Tahoma, Geneva, sans-serif;
+	color:#707070;
+	}
+</style>

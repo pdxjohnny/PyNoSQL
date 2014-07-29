@@ -104,6 +104,8 @@ class server(object):
     def startServer( self ):
         if not os.path.exists( self.saveLocation ):
             os.makedirs( self.saveLocation )
+        self.handleInput( 'create {"database":"_server"}' )
+        self.handleInput( 'create {"database":"_server", "table":"_users"}' )
         server = SocketServer.TCPServer((self.myAddress, self.myPort), ConnectionHandler)
         server.serve_forever()
 
@@ -143,7 +145,7 @@ class server(object):
                 for value in obj:
                     if value != "database" and value != "table":
                         insert[value] = obj[value]
-                self.appendJsonToFile( self.saveLocation + obj.get("database") + "/" + obj.get("table") + ".html" , insert )
+                self.appendJsonToFile( self.saveLocation + obj.get("database") + "/" + obj.get("table") , insert )
                 return "OK"
             else:
                 return "No table"
@@ -160,16 +162,16 @@ class server(object):
         """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
-            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
+            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] ):
                 return "Table or database non-existent"
             if userinput.get("all"):
-                with open( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" , 'r') as outfile:
+                with open( self.saveLocation + userinput["database"] + "/" + userinput["table"] , 'r') as outfile:
                     output = ""
                     for line in outfile:
                         output += line
                     return '{' + output[:-2] + '}'
             if userinput.get("_id"):
-                res = self.loadJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html", userinput["_id"] )
+                res = self.loadJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"], userinput["_id"] )
                 if res:
                     return res
                 else:
@@ -185,10 +187,10 @@ class server(object):
         """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
-            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
+            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] ):
                 return "Table or database non-existent"
             if userinput.get("_id"):
-                res = self.removeJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html", userinput["_id"] )
+                res = self.removeJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"], userinput["_id"] )
                 if res:
                     return "OK"
                 else:
@@ -204,15 +206,15 @@ class server(object):
         """
         userinput = self.stringToObject(userinput)
         if userinput.get("table") and userinput.get("database"):
-            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
+            if not os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] ):
                 return "Table or database non-existent"
             if userinput.get("_id"):
                 insert = {}
                 for value in userinput:
                     if value != "database" and value != "table":
                         insert[value] = userinput[value]
-                res = self.removeJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html", userinput["_id"] )
-                self.appendJsonToFile( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" , insert )
+                res = self.removeJsonFromFile( self.saveLocation + userinput["database"] + "/" + userinput["table"], userinput["_id"] )
+                self.appendJsonToFile( self.saveLocation + userinput["database"] + "/" + userinput["table"] , insert )
                 if res:
                     return "OK"
                 else:
@@ -230,10 +232,10 @@ class server(object):
         if userinput.get("table") and userinput.get("database"):
             if userinput["database"] == True:
                 return "Specify a database"
-            if os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
+            if os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] ):
                 return userinput["table"] + " already exists"
             else:
-                file = open( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" , "w")
+                file = open( self.saveLocation + userinput["database"] + "/" + userinput["table"] , "w")
                 file.close();
                 return "OK"
         elif userinput.get("database"):
@@ -253,8 +255,8 @@ class server(object):
         if userinput.get("table") and userinput.get("database"):
             if userinput["database"] == True:
                 return "Specify a database"
-            if os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" ):
-                os.remove( self.saveLocation + userinput["database"] + "/" + userinput["table"] + ".html" )
+            if os.path.exists( self.saveLocation + userinput["database"] + "/" + userinput["table"] ):
+                os.remove( self.saveLocation + userinput["database"] + "/" + userinput["table"] )
                 return "OK"
             else:
                 return userinput["table"] + " doesn't exist"
@@ -381,8 +383,14 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 response = ""
                 for line in outfile:
                     response += line
+        elif self.path.find('admin') != -1:
+            with open( 'admin.html' , 'r') as outfile:
+                response = ""
+                for line in outfile:
+                    response += line
         else:
             response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:#707070;'><h1>Welcome to PyNoSQL<hr></h1>"
+            response += server().__doc__ + "<br><br>"
             for method in inspect.getmembers(server(), predicate=inspect.ismethod):
                 try:
                     response += getattr(server(), method[0]).__doc__ + "<br><br>"
