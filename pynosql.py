@@ -373,7 +373,7 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         print self.path
-        if self.path.find('?') != -1:
+        if (not self.path.find('/admin?') != -1) and (self.path.find('?') != -1):
             try:
                 request = self.path.split('/')[1][1:]
                 request = urllib.unquote_plus( request )
