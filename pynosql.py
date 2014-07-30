@@ -332,6 +332,7 @@ class server(object):
     def removeJsonFromFile( self, filename, _id ):
         fro = open(filename, "rb")
         res = False
+        seekpoint = False
         while True:
             line = fro.readline()
             if not line:
@@ -339,7 +340,8 @@ class server(object):
             elif line.split(":")[0][1:-2] != _id:
                 seekpoint = fro.tell()
             else:
-                print seekpoint
+                if not seekpoint:
+                    seekpoint = 0
                 res = True
                 break
         frw = open(filename, "r+b")
@@ -389,7 +391,7 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 for line in outfile:
                     response += line
         else:
-            response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:#707070;'><h1>Welcome to PyNoSQL<hr></h1>"
+            response = "<body align='center' style='font:Tahoma, Geneva, sans-serif;color:#707070;'><h1>Welcome to <a href='https://github.com/pdxjohnny/PyNoSQL' >PyNoSQL</a><hr></h1>"
             response += server().__doc__ + "<br><br>"
             for method in inspect.getmembers(server(), predicate=inspect.ismethod):
                 try:

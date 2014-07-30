@@ -1,23 +1,72 @@
+<title>PyNoSQL</title>
+<h1 id="header" >
+	Welcome to PyNoSQL
+</h1>
+<hr>
+<span id="loginButton" style="float:right;color:#668566;" onclick="loginShow()" >Login</span>
+<div id="logindiv" style="display:none;" >
+	<div style="display: table; margin: 0 auto;">
+		<form id="loginForm">
+			Username: <input id="username" placeholder="Username" ></input>
+			Password: <input id="password" placeholder="Password" type="password" ></input>
+			<input type="submit" value="Login"></input>
+		</form>
+	</div>
+	<hr>
+</div>
+
 <script type="text/javascript" src="//localhost:9998/pynosql.js" ></script>
-<select id="databases" ></select>
-<select id="tables" ></select>
-<div id="table" ></div>
+
+<div id="adminArea" style="display:none;">
+
+	<div class="wrap" >
+		<div  class="left" >
+			<form id="newDBForm" >
+				New Database: <input id="newDB" placeholder="New Database" ></input>
+			</form>
+		
+			Current Database: <select id="databases" ></select>
+			<button onclick="dropDB()" >Drop</button>
+		</div>
+		<div class="right" ></div>
+			<form id="newTableForm" >
+				New Table: <input id="newTable" placeholder="New Table" ></input>
+			</form>
+		
+			Current Table: <select id="tables" ></select>
+			<button onclick="dropTable()" >Drop</button>
+			<br>
+			<button onclick="document.getElementById('table').innerHTML += newDocument();" >New Document</button>
+		</div>
+	</div>
+	<br>
+	<div id="table" ></div>
+</div>
+
 <script>
 con = new pynosql();
+window.first = false;
 
-dothis = {
+function getDBS( dbValue ){
+	getDBs = {
 		_action: "show",
 		databases: true
-	};
-
-con.query( dothis, function(databases){
-	databases = JSON.parse(databases)
-	var holder = document.getElementById('databases');
-	for ( var db in databases ){
-		holder.innerHTML += "<option id='"+db+"'>"+databases[db]+"</option>";
-		}
-	showTables( databases[0] )
-	});
+		};
+	con.query( getDBs, function(databases){
+		databases = JSON.parse(databases)
+		var holder = document.getElementById('databases');
+		holder.innerHTML = "";
+		for ( var db in databases ){
+			holder.innerHTML += "<option value='"+databases[db]+"'>"+databases[db]+"</option>";
+			}
+		if ( typeof dbValue !== "undefined" ){
+			holder.value = dbValue
+			showTables( dbValue )
+			}
+		else
+			showTables( databases[0] )
+		});
+	}
 
 function showTables( database ){
 	database = {
@@ -28,14 +77,17 @@ function showTables( database ){
 	con.query( database, function(tables){
 		tables = JSON.parse(tables)
 		var holder = document.getElementById('tables');
+		holder.innerHTML = "";
 		for ( var table in tables ){
-			holder.innerHTML += "<option id='"+table+"'>"+tables[table]+"</option>";
+			holder.innerHTML += "<option value='"+tables[table]+"'>"+tables[table]+"</option>";
 			}
 		getTable( database.database, tables[0] )
 		});
 	}
 
 function getTable( database, table ){
+	var holder = document.getElementById('table');
+	holder.innerHTML = "";
 	table = {
 		_action: "select",
 		database: database,
@@ -43,19 +95,248 @@ function getTable( database, table ){
 		all: true
 		};
 	con.query( table, function(table){
-		console.log(table)
+		if ( table === "{}" ) return false;
 		table = JSON.parse(table);
-		table = con.makeTable( table );
-		holder = document.getElementById('table');
-		holder.appendChild( table );
+		for ( var doc in table ){
+			holder.innerHTML += newDocument( table[doc] )
+			}
 		});
+	}
+
+newDB = document.getElementById('newDBForm');
+newTable = document.getElementById('newTableForm');
+
+databases = document.getElementById('databases');
+tables = document.getElementById('tables');
+
+newDB.addEventListener('submit', function(e){
+	e.preventDefault();
+	var createDB = {
+		_action: "create",
+		database: document.getElementById('newDB').value
+		};
+	con.query( createDB, function(returnCode){
+		getDBS( createDB.database );
+		document.getElementById('newDB').value = ""
+		});
+	return false;
+	},false);
+
+newTable.addEventListener('submit', function(e){
+	e.preventDefault();
+	var createTable = {
+		_action: "create",
+		database: databases.value,
+		table: document.getElementById('newTable').value
+		};
+	con.query( createTable, function(returnCode){
+		getDBS( createTable.database );
+		tables.value = createTable.table
+		document.getElementById('newTable').value = ""
+		});
+	return false;
+	},false);
+
+databases.addEventListener('change', function(e){
+	showTables( this.value )
+	},false);
+
+tables.addEventListener('change', function(e){
+	getTable( databases.value, this.value )
+	},false);
+
+
+function dropDB(){
+	var dropDB = {
+		_action: "drop",
+		database: databases.value
+		};
+	con.query( dropDB, function(returnCode){
+		getDBS();
+		});
+	}
+
+function dropTable(){
+	var dropTable = {
+		_action: "drop",
+		database: databases.value,
+		table: tables.value
+		};
+	con.query( dropTable, function(returnCode){
+		getDBS( dropTable.database );
+		});
+	}
+
+function loginShow(){
+	document.getElementById('logindiv').style.display = "block";
+	var check = {
+		_action: "select",
+		database: "_server",
+		table: "_users",
+		all: true
+		};
+	con.query( check, function(returnCode){
+		if ( returnCode === "{}" ){
+			document.getElementById('loginForm').innerHTML += "<br><center>No users yet, you will be admin</center>";
+			window.first = true
+			}
+		});
+	}
+
+document.getElementById('logindiv').addEventListener('submit', function(e){
+	e.preventDefault();
+	if ( window.first ){
+		var create = {
+			_action: "insert",
+			database: "_server",
+			table: "_users",
+			_id: document.getElementById('username').value,
+			password: document.getElementById('password').value
+			};
+		con.query( create, function(user){
+			if ( user === "OK" ) {
+				document.getElementById('logindiv').style.display = "none";
+				document.getElementById('loginButton').style.display = "none";
+				document.getElementById('adminArea').style.display = "block";
+				window.user = create;
+				document.getElementById('header').innerHTML = "Welcome to PyNoSQL " + window.user._id.charAt(0).toUpperCase() + window.user._id.slice(1);
+				getDBS();
+				}
+			});
+		}
+	var check = {
+		_action: "select",
+		database: "_server",
+		table: "_users",
+		_id: document.getElementById('username').value
+		};
+	con.query( check, function(user){
+		if ( user === "Not found" )
+			alert("Sorry thats not a valid username")
+		else {
+			if ( JSON.parse(user).password === document.getElementById('password').value ) {
+				document.getElementById('logindiv').style.display = "none";
+				document.getElementById('loginButton').style.display = "none";
+				document.getElementById('adminArea').style.display = "block";
+				window.user = JSON.parse(user);
+				document.getElementById('header').innerHTML = "Welcome to PyNoSQL " + window.user._id.charAt(0).toUpperCase() + window.user._id.slice(1);
+				getDBS();
+				}
+			else alert("Sorry that's the wrong password")
+			}
+		});
+	return false;
+	},false);
+
+function newDocument( doc ){
+	var div = '<div class="wrap" ><div class="left" ><button id="button_id=NEW_DOC" onclick="saveOne(\'doc_id=NEW_DOC\')" >Save</button>';
+	div += '<button id="button_id=NEW_DOC" onclick="deleteOne(\'doc_id=NEW_DOC\')" >Delete</button></div>';
+	div += '<div class="right" ><pre id="doc_id=NEW_DOC" contenteditable="true" >{"_id":""}';
+	if ( typeof doc !== "undefined" ) {
+		var div = '<div class="wrap" ><div class="left" ><button id="button_id='+doc._id+'" onclick="saveOne(\'doc_id='+doc._id+'\')" >Save</button>';
+		div += '<button id="button_id='+doc._id+'" onclick="deleteOne(\'doc_id='+doc._id+'\')" >Delete</button></div>';
+		div += '<div class="right" ><pre id="doc_id='+doc._id+'" contenteditable="true" >';
+		div += JSON.stringify(doc);
+		}
+	div += "</pre></div></div>"
+	return div
+	}
+
+function saveOne( doc_id ){
+	var doc = document.getElementById(doc_id);
+	var button = document.getElementById( doc_id.replace("doc", "button") );
+	var header = document.getElementById('header');
+	var head = header.innerHTML;
+	try {
+	    var json = JSON.parse(doc.innerHTML);
+	    json._action = "update";
+		json.database = databases.value;
+		json.table = tables.value;
+		con.query( json, function(response){
+			if ( response === "OK" ) {
+				button.id = "button_id="+json._id;
+				doc.id = "doc_id="+json._id;
+				button.onclick = "saveOne(\'button_id="+json._id+"\')";
+				doc.onclick = "saveOne(\'doc_id="+json._id+"\')";
+				header.innerHTML += "<span style='float:right;' >Saved</span>";
+				}
+			else console.log(response)
+			});
+		}
+	catch(err) {
+	    header.innerHTML += "<span style='float:right;color:red;' >That's an invaild json</span>";
+		}
+	setTimeout(function(){
+		header.innerHTML = head;
+		},3000);
+	}
+
+function deleteOne( doc_id ){
+	var doc = document.getElementById(doc_id);
+	var button = document.getElementById( doc_id.replace("doc", "button") );
+	var header = document.getElementById('header');
+	var head = header.innerHTML;
+	try {
+		var deleteDoc = {
+			_action: "delete",
+			database: databases.value,
+			table: tables.value,
+			_id: doc_id.split("doc_id=")[1]
+			};
+		con.query( deleteDoc, function(response){
+			if ( response === "OK" ) {
+				doc.parentElement.parentElement.remove()
+				header.innerHTML += "<span style='float:right;' >Deleted</span>";
+				}
+			else console.log(response)
+			});
+		}
+	catch(err) {
+	    header.innerHTML += "<span style='float:right;color:red;' >Error, couldn't delete</span>";
+		}
+	setTimeout(function(){
+		header.innerHTML = head;
+		},3000);
+	}
+
+Element.prototype.remove = function() {
+    this.parentElement.removeChild(this);
+	}
+NodeList.prototype.remove = HTMLCollection.prototype.remove = function() {
+    for(var i = 0, len = this.length; i < len; i++) {
+        if(this[i] && this[i].parentElement) {
+            this[i].parentElement.removeChild(this[i]);
+        	}
+    	}
 	}
 </script>
 
 <style>
-body {
-	align = center;
+html {
 	font:Tahoma, Geneva, sans-serif;
-	color:#707070;
+	background-color: #FEFEFB;
 	}
+h1 {
+	color:#668566;
+	}
+table {
+	border: 1;
+	}
+form: {
+	margin: 0;
+	padding: 0;
+	}
+input: {
+	display: inline;
+	}
+.wrap {
+	width: 100%;
+	overflow: hidden; /* will contain if #first is longer than #second */
+}
+.left {
+	float:left; /* add this */
+}
+.right {
+	overflow: hidden; /* if you don't want #second to wrap below #first */
+}
 </style>
