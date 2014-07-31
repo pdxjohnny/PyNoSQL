@@ -227,24 +227,30 @@ document.getElementById('logindiv').addEventListener('submit', function(e){
 		});
 	return false;
 	},false);
-
+var allNew = 0;
 function newDocument( doc ){
-	var div = '<div class="wrap" ><div class="left" ><button id="button_id=NEW_DOC" onclick="saveOne(\'doc_id=NEW_DOC\')" >Save</button>';
-	div += '<button id="button_id=NEW_DOC" onclick="deleteOne(\'doc_id=NEW_DOC\')" >Delete</button></div>';
-	div += '<div class="right" ><pre id="doc_id=NEW_DOC" contenteditable="true" >{"_id":""}';
+	var div = '<div class="wrap" ><div class="left" ><button id="buttonSave_id=NEW_DOC'+allNew+'" onclick="saveOne(this.id)" >Save</button>';
+	div += '<button id="buttonDelete_id=NEW_DOC'+allNew+'" onclick="deleteOne(this.id)" >Delete</button></div>';
+	div += '<div class="right" ><pre id="doc_id=NEW_DOC'+allNew+'" contenteditable="true" >{"_id":""}';
 	if ( typeof doc !== "undefined" ) {
-		var div = '<div class="wrap" ><div class="left" ><button id="button_id='+doc._id+'" onclick="saveOne(\'doc_id='+doc._id+'\')" >Save</button>';
-		div += '<button id="button_id='+doc._id+'" onclick="deleteOne(\'doc_id='+doc._id+'\')" >Delete</button></div>';
+		var div = '<div class="wrap" ><div class="left" ><button id="buttonSave_id='+doc._id+'" onclick="saveOne(this.id)" >Save</button>';
+		div += '<button id="buttonDelete_id='+doc._id+'" onclick="deleteOne(this.id)" >Delete</button></div>';
 		div += '<div class="right" ><pre id="doc_id='+doc._id+'" contenteditable="true" >';
 		div += JSON.stringify(doc);
 		}
 	div += "</pre></div></div>"
+	allNew++;
 	return div
 	}
 
 function saveOne( doc_id ){
+	if ( doc_id.indexOf("buttonSave") > -1 )
+		doc_id = doc_id.replace("buttonSave", "doc");
+	if ( doc_id.indexOf("buttonDelete") > -1 )
+		doc_id = doc_id.replace("buttonDelete", "doc");
 	var doc = document.getElementById(doc_id);
-	var button = document.getElementById( doc_id.replace("doc", "button") );
+	var buttonSave = document.getElementById( doc_id.replace("doc", "buttonSave") );
+	var buttonDelete = document.getElementById( doc_id.replace("doc", "buttonDelete") );
 	var header = document.getElementById('header');
 	var head = header.innerHTML;
 	try {
@@ -253,10 +259,12 @@ function saveOne( doc_id ){
 		json.database = databases.value;
 		json.table = tables.value;
 		con.query( json, function(response){
-			if ( response === "OK" ) {
-				button.id = "button_id="+json._id;
+			if ( response === "OK" || response === "Created" ) {
+				buttonSave.id = "buttonSave_id="+json._id;
+				buttonDelete.id = "buttonDelete_id="+json._id;
 				doc.id = "doc_id="+json._id;
-				button.onclick = "saveOne(\'button_id="+json._id+"\')";
+				buttonSave.onclick = function(){ saveOne(this.id.replace("doc", "buttonDelete")); } ;
+				buttonDelete.onclick = function(){ saveOne(this.id.replace("doc", "buttonDelete")); } ;
 				doc.onclick = "saveOne(\'doc_id="+json._id+"\')";
 				header.innerHTML += "<span style='float:right;' >Saved</span>";
 				}
@@ -265,6 +273,7 @@ function saveOne( doc_id ){
 		}
 	catch(err) {
 	    header.innerHTML += "<span style='float:right;color:red;' >That's an invaild json</span>";
+		console.log(doc_id, doc.innerHTML)
 		}
 	setTimeout(function(){
 		header.innerHTML = head;
