@@ -95,7 +95,7 @@ class server(object):
     Server accepts query's in the format of: action {JSON}
     """
     def __init__( self ):
-        self.saveLocation = ".dbs/"
+        self.saveLocation = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + '/.dbs/'
         self.myAddress = '0.0.0.0'
         self.myPort = 9999
         self.myWebPort = 9998
@@ -372,7 +372,6 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         SimpleHTTPServer.SimpleHTTPRequestHandler.end_headers(self)
 
     def do_GET(self):
-        print self.path
         if (not self.path.find('/admin?') != -1) and (self.path.find('?') != -1):
             try:
                 request = self.path.split('/')[1][1:]
@@ -381,12 +380,12 @@ class MyHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             except:
                 response = "Server Error"
         elif self.path.find('pynosql.js') != -1:
-            with open( 'pynosql.js' , 'r') as outfile:
+            with open( os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + '/pynosql.js' , 'r') as outfile:
                 response = ""
                 for line in outfile:
                     response += line
         elif self.path.find('admin') != -1:
-            with open( 'admin.html' , 'r') as outfile:
+            with open( os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + '/admin.html' , 'r') as outfile:
                 response = ""
                 for line in outfile:
                     response += line
